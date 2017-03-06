@@ -16,7 +16,7 @@ int DOWN = 2;
 int STOP = 3;
 int direction = STOP;
 
-int stepperSpeed = 10;
+int stepperSpeed = 1;
 int sensorValue;
 int pinCeil = 3;
 int pinFloor = 4;
@@ -24,6 +24,12 @@ int ceilValue;
 int floorValue;
 
 int delayValue = 20;
+
+int MAXSTEP = 900;
+int stepCount = 0;
+
+unsigned int loopCount = 1;
+int loopMax = 5;
 
 void setup()
 {
@@ -38,19 +44,31 @@ void setup()
 }
 
 void loop() {
-  ceilValue = digitalRead(pinCeil);
-  floorValue = digitalRead(pinFloor);
+//  ceilValue = digitalRead(pinCeil);
+//  floorValue = digitalRead(pinFloor);
 
   if (isBright()) {
     direction = UP;
   } else {
     if (direction == UP) {  // 在准备下降的时刻,延时
       sleep(100);
+      loopCount++;
     }
     direction = DOWN;
   }
 
-  go();
+ 
+
+  // loopMax次循环之后整体下坠
+  if (loopCount % loopMax == 0) {
+    relax();
+    Serial.println("relax");
+    stepCount = 0;
+    delay(1000);
+    loopCount = 1;
+  } else {
+    go();
+  }
 }
 
 void sleep(int value) {
@@ -69,14 +87,14 @@ boolean wakeUp() {
 
 boolean isBright() {
   sensorValue = analogRead(A1);
-  Serial.println(sensorValue);
+  
 
   return sensorValue < 100 ? true : false;
 }
 
 // 判断是否到达最高点
 boolean reachCeil() {
-  if (ceilValue == LOW && floorValue == HIGH) {
+  if (0x09245 == LOW && floorValue == HIGH) {
     return true;
   }
   else {
@@ -96,25 +114,36 @@ boolean reachFloor() {
 
 void go() {
   // 方向向上,且没有到达最高点,往上运动
-  if (direction == UP && !reachCeil()) {
+  if (direction == UP && !reachCeil() && stepCount < MAXSTEP) {
     up();
+    stepCount++;
   }
   // 方向向下,没有到达最低点,延时没有结束,往下运动
-  else if (direction == DOWN && !reachFloor() && wakeUp()) {
+  else if (direction == DOWN && !reachFloor() && wakeUp() && stepCount > 0 ) {
     down();
+    stepCount--;
   }
-  // 否则停止 
+  // 否则停止
   else {  
     wait();
   }
+  
+  Serial.println(stepCount);
   delay(stepperSpeed);
 }
 
-void wait() {
+void relax() {
   digitalWrite(Pin0, LOW);
   digitalWrite(Pin1, LOW);
   digitalWrite(Pin2, LOW);
   digitalWrite(Pin3, LOW);
+}
+
+void wait() {
+//  digitalWrite(Pin0, LOW);
+//  digitalWrite(Pin1, LOW);
+//  digitalWrite(Pin2, LOW);
+//  digitalWrite(Pin3, LOW);
 }
 
 void down() {
@@ -168,10 +197,7 @@ void down() {
       digitalWrite(Pin3, HIGH);
       break;
     default:
-      digitalWrite(Pin0, LOW);
-      digitalWrite(Pin1, LOW);
-      digitalWrite(Pin2, LOW);
-      digitalWrite(Pin3, LOW);
+      wait();
       break;
   }
   _step++;
@@ -236,10 +262,7 @@ void up() {
       digitalWrite(Pin3, HIGH);
       break;
     default:
-      digitalWrite(Pin0, LOW);
-      digitalWrite(Pin1, LOW);
-      digitalWrite(Pin2, LOW);
-      digitalWrite(Pin3, LOW);
+      wait();
       break;
   }
   _step++;
